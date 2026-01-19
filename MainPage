@@ -1,0 +1,177 @@
+using System;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Media;
+using System.Windows.Threading;
+
+namespace wpfapp2
+{
+    public partial class AnaSayfa : Page
+    {
+        private string currentUser;
+
+        private static DispatcherTimer timer;
+        private static TimeSpan time = TimeSpan.FromMinutes(25);
+        private static bool isWorkTime = true;
+        private static bool isRunning = false;
+
+        private MediaPlayer player = new MediaPlayer();
+
+        public AnaSayfa(string user)
+        {
+            InitializeComponent();
+            currentUser = user;
+
+            WelcomeText.Text = $"Hoş geldin, {currentUser} 👋";
+            DateText.Text = DateTime.Now.ToString("dd MMMM yyyy, dddd");
+
+            DispatcherTimer clockTimer = new DispatcherTimer();
+            clockTimer.Interval = TimeSpan.FromSeconds(1);
+            clockTimer.Tick += (s, e) => { ClockText.Text = DateTime.Now.ToString("HH:mm"); };
+            clockTimer.Start();
+
+            if (timer == null)
+            {
+                timer = new DispatcherTimer();
+                timer.Interval = TimeSpan.FromSeconds(1);
+            }
+
+            timer.Tick -= Timer_Tick;
+            timer.Tick += Timer_Tick;
+
+            UpdateTimerDisplay();
+            SyncButtonState();
+            UpdateStatusText();
+        }
+
+        private void Ozet_Click(object sender, RoutedEventArgs e)
+        {
+            NavigationService?.Navigate(new OzetSayfasi(currentUser));
+        }
+
+        private void NotDefteri_Click(object sender, RoutedEventArgs e)
+        {
+            NavigationService?.Navigate(new NotDefteri(currentUser));
+        }
+
+        private void DersProgrami_Click(object sender, RoutedEventArgs e)
+        {
+            NavigationService?.Navigate(new DersProgrami(currentUser));
+        }
+        private void Flashcards_Click(object sender, RoutedEventArgs e)
+        {
+            NavigationService?.Navigate(new FlashcardsPage(currentUser));
+        }
+        private void BtnLogout_Click(object sender, RoutedEventArgs e)
+        {
+            NavigationService?.Navigate(new loginpage());
+        }
+
+        private void Timer_Tick(object sender, EventArgs e)
+        {
+            if (time.TotalSeconds > 0)
+            {
+                time = time.Subtract(TimeSpan.FromSeconds(1));
+                UpdateTimerDisplay();
+            }
+            else
+            {
+                timer.Stop();
+                isRunning = false;
+                isWorkTime = !isWorkTime;
+
+                try
+                {
+                    player.Open(new Uri(@"C:\Windows\Media\Alarm01.wav"));
+                    player.Play();
+                }
+                catch
+                {
+                    System.Media.SystemSounds.Exclamation.Play();
+                }
+
+                if (isWorkTime)
+                {
+                    MessageBox.Show("Mola bitti! Tekrar çalışmaya başla. 💪", "Süre Doldu");
+                    ResetPomodoroToWork();
+                }
+                else
+                {
+                    MessageBox.Show("Çalışma süresi bitti! Şimdi 5 dakika mola. ☕", "Tebrikler");
+                    time = TimeSpan.FromMinutes(5);
+                    UpdateStatusText();
+                    UpdateTimerDisplay();
+                    SyncButtonState();
+                }
+            }
+        }
+
+        private void BtnStartPomo_Click(object sender, RoutedEventArgs e)
+        {
+            if (!isRunning)
+            {
+                timer.Start();
+                isRunning = true;
+            }
+            else
+            {
+                timer.Stop();
+                isRunning = false;
+            }
+            SyncButtonState();
+        }
+
+        private void BtnResetPomo_Click(object sender, RoutedEventArgs e)
+        {
+            ResetPomodoroToWork();
+            SyncButtonState();
+        }
+
+        private void ResetPomodoroToWork()
+        {
+            timer.Stop();
+            isRunning = false;
+            isWorkTime = true;
+            time = TimeSpan.FromMinutes(25);
+
+            UpdateTimerDisplay();
+            UpdateStatusText();
+        }
+
+        private void UpdateTimerDisplay()
+        {
+            TxtTimer.Text = time.ToString(@"mm\:ss");
+        }
+
+        private void UpdateStatusText()
+        {
+            if (isWorkTime)
+            {
+                TxtStatus.Text = "🎯 Çalışma Zamanı";
+                TimerBorder.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#E74C3C"));
+            }
+            else
+            {
+                TxtStatus.Text = "☕ Mola Zamanı";
+                TimerBorder.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#2ECC71"));
+            }
+        }
+
+        private void SyncButtonState()
+        {
+            if (FindName("BtnStart") is Button btn)
+            {
+                if (isRunning)
+                {
+                    btn.Content = "Durdur";
+                    btn.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#E74C3C"));
+                }
+                else
+                {
+                    btn.Content = isWorkTime ? "Başlat" : "Molayı Başlat";
+                    btn.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#4A90E2"));
+                }
+            }
+        }
+    }
+}
