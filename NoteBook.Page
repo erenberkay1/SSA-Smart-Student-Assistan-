@@ -1,0 +1,135 @@
+using System;
+using System.Collections.ObjectModel;
+using System.Globalization;
+using System.IO;
+using System.Text.Json;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Data;
+
+namespace wpfapp2
+{
+    public partial class NotDefteri : Page
+    {
+        ObservableCollection<Note> Notes = new ObservableCollection<Note>();
+        private string currentUser = "admin";
+        private string filePath => $"{currentUser}_notes.json";
+
+
+
+        public NotDefteri(string username)
+        {
+            InitializeComponent();
+            currentUser = username;
+            NotesList.ItemsSource = Notes;
+            LoadNotes();
+        }
+
+        private void Kaydet_Click(object sender, RoutedEventArgs e)
+        {
+            if (string.IsNullOrWhiteSpace(TitleBox.Text) || string.IsNullOrWhiteSpace(ContentBox.Text))
+            {
+                MessageBox.Show("Başlık ve içerik boş olamaz.");
+                return;
+            }
+
+            Note newNote = new Note
+            {
+                Title = TitleBox.Text,
+                Content = ContentBox.Text,
+                Date = DateTime.Now.ToString("dd.MM.yyyy HH:mm")
+            };
+
+            Notes.Add(newNote);
+            SaveNotes();
+
+            TitleBox.Text = "";
+            ContentBox.Text = "";
+        }
+
+        private void Sil_Click(object sender, RoutedEventArgs e)
+        {
+            if (NotesList.SelectedItem is Note selected)
+            {
+                Notes.Remove(selected);
+                DetailBox.Text = "";
+                SaveNotes();
+            }
+            else
+            {
+                MessageBox.Show("Silmek için bir not seçiniz.");
+            }
+        }
+
+        private void NotesList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (NotesList.SelectedItem is Note n)
+            {
+                DetailBox.Text =
+                    $"Başlık: {n.Title}\n" +
+                    $"Tarih: {n.Date}\n\n" +
+                    $"{n.Content}";
+            }
+        }
+
+
+        private void SaveNotes()
+        {
+            try
+            {
+                string json = JsonSerializer.Serialize(Notes);
+                File.WriteAllText(filePath, json);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Notlar kaydedilirken hata oluştu: " + ex.Message);
+            }
+        }
+
+
+        private void LoadNotes()
+        {
+            try
+            {
+                if (File.Exists(filePath))
+                {
+                    string json = File.ReadAllText(filePath);
+                    var loadedNotes = JsonSerializer.Deserialize<ObservableCollection<Note>>(json);
+                    if (loadedNotes != null)
+                        Notes = loadedNotes;
+
+                    NotesList.ItemsSource = Notes;
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Notlar yüklenirken hata oluştu: " + ex.Message);
+            }
+        }
+
+        private void Back_Click(object sender, RoutedEventArgs e)
+        {
+            NavigationService?.Navigate(new AnaSayfa(currentUser));
+        }
+    }
+
+    public class Note
+    {
+        public string Title { get; set; }
+        public string Content { get; set; }
+        public string Date { get; set; }
+    }
+
+    public class StringNullOrEmptyToVisibilityConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            return string.IsNullOrEmpty(value as string) ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
+}
