@@ -1,0 +1,188 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Animation;
+using System.Xml.Serialization;
+
+namespace wpfapp2
+{
+    public class Flashcard
+    {
+        public string Front { get; set; }
+        public string Back { get; set; }
+    }
+
+    public partial class FlashcardsPage : Page
+    {
+        private List<Flashcard> cardDeck = new List<Flashcard>();
+        private string currentUser;
+        private string filePath;
+
+        private int currentIndex = 0;
+        private bool isFrontVisible = true;
+
+        public FlashcardsPage(string incomingUser)
+        {
+            InitializeComponent();
+            currentUser = incomingUser;
+
+
+            string folder = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+            filePath = Path.Combine(folder, $"flashcards_{currentUser}.xml");
+
+            LoadData();
+            UpdateCardDisplay();
+        }
+
+
+
+        private void AddCard_Click(object sender, RoutedEventArgs e)
+        {
+            if (string.IsNullOrWhiteSpace(FrontTextBox.Text) || string.IsNullOrWhiteSpace(BackTextBox.Text))
+            {
+                MessageBox.Show("Lütfen kartın önü ve arkası için metin girin.", "Uyarı");
+                return;
+            }
+
+            cardDeck.Add(new Flashcard { Front = FrontTextBox.Text, Back = BackTextBox.Text });
+            SaveData();
+
+            FrontTextBox.Clear();
+            BackTextBox.Clear();
+
+
+            currentIndex = cardDeck.Count - 1;
+            UpdateCardDisplay();
+            MessageBox.Show("Kart desteye eklendi!");
+        }
+
+        private void SaveData()
+        {
+            try
+            {
+                XmlSerializer serializer = new XmlSerializer(typeof(List<Flashcard>));
+                using (StreamWriter writer = new StreamWriter(filePath))
+                {
+                    serializer.Serialize(writer, cardDeck);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Kartlar kaydedilirken hata oluştu: " + ex.Message);
+            }
+        }
+
+        private void LoadData()
+        {
+            if (File.Exists(filePath))
+            {
+                try
+                {
+                    XmlSerializer serializer = new XmlSerializer(typeof(List<Flashcard>));
+                    using (StreamReader reader = new StreamReader(filePath))
+                    {
+                        cardDeck = (List<Flashcard>)serializer.Deserialize(reader);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Kartlar yüklenirken hata oluştu: " + ex.Message);
+                }
+            }
+        }
+
+        private void ClearAll_Click(object sender, RoutedEventArgs e)
+        {
+            if (MessageBox.Show("Tüm kelime destesini silmek istediğinize emin misiniz? Bu işlem geri alınamaz.",
+                                "Desteyi Sil", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes)
+            {
+                cardDeck.Clear();
+                SaveData();
+                UpdateCardDisplay();
+            }
+        }
+
+
+
+        private void UpdateCardDisplay()
+        {
+            if (cardDeck.Count == 0)
+            {
+                FrontText.Text = "Desteniz Boş";
+                BackText.Text = "Yeni kart ekleyin";
+                CardCountText.Text = "0 / 0";
+            }
+            else
+            {
+                FrontText.Text = cardDeck[currentIndex].Front;
+                BackText.Text = cardDeck[currentIndex].Back;
+                CardCountText.Text = $"{currentIndex + 1} / {cardDeck.Count}";
+            }
+
+            isFrontVisible = true;
+            FrontText.Visibility = Visibility.Visible;
+            BackText.Visibility = Visibility.Collapsed;
+            FlashcardBorder.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#4A90E2"));
+        }
+
+        private void Card_Click(object sender, MouseButtonEventArgs e)
+        {
+            if (cardDeck.Count == 0) return;
+
+
+            DoubleAnimation shrinkAnimation = new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(100));
+            shrinkAnimation.Completed += (s, a) =>
+            {
+
+                if (isFrontVisible)
+                {
+                    FrontText.Visibility = Visibility.Collapsed;
+                    BackText.Visibility = Visibility.Visible;
+                    FlashcardBorder.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#2F3640"));
+                }
+                else
+                {
+                    FrontText.Visibility = Visibility.Visible;
+                    BackText.Visibility = Visibility.Collapsed;
+                    FlashcardBorder.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#4A90E2"));
+                }
+                isFrontVisible = !isFrontVisible;
+
+
+                DoubleAnimation growAnimation = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(100));
+                CardTextGrid.RenderTransform.BeginAnimation(ScaleTransform.ScaleYProperty, growAnimation);
+            };
+
+            CardTextGrid.RenderTransform = new ScaleTransform(1, 1, 0.5, 0.5);
+            CardTextGrid.RenderTransform.BeginAnimation(ScaleTransform.ScaleYProperty, shrinkAnimation);
+        }
+
+        private void NextCard_Click(object sender, RoutedEventArgs e)
+        {
+            if (cardDeck.Count > 0)
+            {
+                currentIndex = (currentIndex + 1) % cardDeck.Count;
+                UpdateCardDisplay();
+            }
+        }
+
+        private void PrevCard_Click(object sender, RoutedEventArgs e)
+        {
+            if (cardDeck.Count > 0)
+            {
+                currentIndex = (currentIndex - 1 + cardDeck.Count) % cardDeck.Count;
+                UpdateCardDisplay();
+            }
+        }
+
+
+        private void Back_Click(object sender, RoutedEventArgs e)
+        {
+            NavigationService?.Navigate(new AnaSayfa(currentUser));
+        }
+    }
+}
