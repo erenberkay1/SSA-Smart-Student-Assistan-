@@ -1,0 +1,154 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Windows;
+using System.Windows.Controls;
+using System.Xml.Serialization;
+
+namespace wpfapp2
+{
+    public class LessonItem
+    {
+        public string Day { get; set; }
+        public string Time { get; set; }
+        public string LessonName { get; set; }
+    }
+
+    public partial class DersProgrami : Page
+    {
+        private List<LessonItem> lessonList = new List<LessonItem>();
+
+
+        private string currentUser;
+        private string filePath;
+
+
+        public DersProgrami(string incomingUser)
+        {
+            InitializeComponent();
+
+            currentUser = incomingUser;
+
+
+            string folder = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+            filePath = Path.Combine(folder, $"ders_programi_{currentUser}.xml");
+
+
+            LoadData();
+        }
+
+
+        public DersProgrami()
+        {
+            InitializeComponent();
+            currentUser = "Misafir";
+            string folder = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+            filePath = Path.Combine(folder, $"ders_programi_{currentUser}.xml");
+            LoadData();
+        }
+
+
+
+        private void AddLesson_Click(object sender, RoutedEventArgs e)
+        {
+            if (string.IsNullOrWhiteSpace(TimeBox.Text) || string.IsNullOrWhiteSpace(LessonBox.Text))
+            {
+                MessageBox.Show("Lütfen saat ve ders adını giriniz.", "Uyarı", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            LessonItem newItem = new LessonItem
+            {
+                Day = DayComboBox.Text,
+                Time = TimeBox.Text,
+                LessonName = LessonBox.Text
+            };
+
+            lessonList.Add(newItem);
+            RefreshGrid();
+            SaveData();
+
+            LessonBox.Clear();
+            TimeBox.Clear();
+        }
+
+        private void DeleteLesson_Click(object sender, RoutedEventArgs e)
+        {
+            if (ScheduleGrid.SelectedItem is LessonItem selectedItem)
+            {
+                lessonList.Remove(selectedItem);
+                RefreshGrid();
+                SaveData();
+            }
+            else
+            {
+                MessageBox.Show("Lütfen silmek için listeden bir ders seçiniz.");
+            }
+        }
+
+        private void RefreshGrid()
+        {
+            var sortedList = lessonList.OrderBy(x => GetDayIndex(x.Day)).ThenBy(x => x.Time).ToList();
+            ScheduleGrid.ItemsSource = null;
+            ScheduleGrid.ItemsSource = sortedList;
+        }
+
+        private int GetDayIndex(string day)
+        {
+            switch (day)
+            {
+                case "Pazartesi": return 1;
+                case "Salı": return 2;
+                case "Çarşamba": return 3;
+                case "Perşembe": return 4;
+                case "Cuma": return 5;
+                case "Cumartesi": return 6;
+                case "Pazar": return 7;
+                default: return 8;
+            }
+        }
+
+        private void SaveData()
+        {
+            try
+            {
+                XmlSerializer serializer = new XmlSerializer(typeof(List<LessonItem>));
+                using (StreamWriter writer = new StreamWriter(filePath))
+                {
+                    serializer.Serialize(writer, lessonList);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Kaydetme hatası: " + ex.Message);
+            }
+        }
+
+        private void LoadData()
+        {
+            if (File.Exists(filePath))
+            {
+                try
+                {
+                    XmlSerializer serializer = new XmlSerializer(typeof(List<LessonItem>));
+                    using (StreamReader reader = new StreamReader(filePath))
+                    {
+                        lessonList = (List<LessonItem>)serializer.Deserialize(reader);
+                    }
+                    RefreshGrid();
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Yükleme hatası: " + ex.Message);
+                }
+            }
+        }
+
+        private void Back_Click(object sender, RoutedEventArgs e)
+        {
+            
+            NavigationService?.Navigate(new AnaSayfa(currentUser));
+        }
+    }
+}
