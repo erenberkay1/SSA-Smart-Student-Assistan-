@@ -1,0 +1,69 @@
+using System;
+using System.Data.SQLite;
+using System.Windows;
+using System.Windows.Controls;
+
+namespace wpfapp2
+{
+    public partial class loginpage : Page
+    {
+
+        string connectionString = @"Data Source=D:\VisualStudioCode\wpfapp2\wpfapp2\Userinfo.db";
+
+        public loginpage()
+        {
+            InitializeComponent();
+        }
+
+        private void LoginButton_Click(object sender, RoutedEventArgs e)
+        {
+
+            string kullaniciAdi = txtemail.Text;
+            string sifre = txtsifre.Password;
+
+            if (string.IsNullOrWhiteSpace(kullaniciAdi) || string.IsNullOrWhiteSpace(sifre))
+            {
+                MessageBox.Show("Lütfen tüm alanları doldurun");
+                return;
+            }
+
+            try
+            {
+                using (SQLiteConnection conn = new SQLiteConnection(connectionString))
+                {
+                    conn.Open();
+
+
+                    string query = "SELECT COUNT(*) FROM userinfo WHERE Email = @Email AND Sifre = @Sifre";
+                    SQLiteCommand cmd = new SQLiteCommand(query, conn);
+                    cmd.Parameters.AddWithValue("@Email", kullaniciAdi);
+                    cmd.Parameters.AddWithValue("@Sifre", sifre);
+
+
+                    int count = Convert.ToInt32(cmd.ExecuteScalar());
+
+                    if (count > 0)
+                    {
+                        MessageBox.Show("Giriş başarılı!");
+
+                        NavigationService?.Navigate(new AnaSayfa(kullaniciAdi));
+                    }
+                    else
+                    {
+                        MessageBox.Show("Kullanıcı adı veya şifre hatalı!");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Hata oluştu: " + ex.Message);
+            }
+        }
+
+        private void GoRegister_Click(object sender, RoutedEventArgs e)
+        {
+          
+            NavigationService?.Navigate(new registerpage());
+        }
+    }
+}
