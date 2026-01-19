@@ -1,0 +1,199 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text.RegularExpressions;
+using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Controls;
+
+namespace wpfapp2
+{
+    public partial class OzetSayfasi : Page
+    {
+        private string currentUser;
+
+
+        public OzetSayfasi(string currentUser)
+        {
+            InitializeComponent();
+            this.currentUser = currentUser;
+        }
+
+        public OzetSayfasi()
+        {
+            InitializeComponent();
+            this.currentUser = "Misafir";
+        }
+
+        private async void SendMessage_Click(object sender, RoutedEventArgs e)
+        {
+            string userInput = InputText.Text;
+
+            if (string.IsNullOrWhiteSpace(userInput))
+            {
+                ResponseText.Text = "Lütfen özetlenecek bir metin veya ders notu giriniz.";
+                return;
+            }
+
+            ResponseText.Text = "Özetleniyor...";
+
+
+            string ozet = await Task.Run(() => YerelOzetle(userInput));
+
+            ResponseText.Text = ozet;
+        }
+
+        private void Back_Click(object sender, RoutedEventArgs e)
+        {
+            NavigationService?.Navigate(new AnaSayfa(currentUser));
+        }
+
+        private string YerelOzetle(string metin)
+        {
+            try
+            {
+
+                var hamSatirlar = metin.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
+                var duzeltilmisMetin = "";
+
+                foreach (var satir in hamSatirlar)
+                {
+                    string temizSatir = satir.Trim();
+                    if (string.IsNullOrWhiteSpace(temizSatir)) continue;
+
+
+                    char sonKarakter = temizSatir.Last();
+                    if (!char.IsPunctuation(sonKarakter))
+                    {
+                        temizSatir += ".";
+                    }
+                    duzeltilmisMetin += temizSatir + " ";
+                }
+
+                var cumleler = Regex.Split(duzeltilmisMetin, @"(?<=[.!?])\s+")
+                                    .Where(c => c.Length > 10)
+                                    .ToArray();
+
+                if (cumleler.Length < 3)
+                    return "Notlarınız özetlenemeyecek kadar kısa. Olduğu gibi gösteriliyor:\n\n" + metin;
+
+
+                var kelimeler = TemizleVeAyikla(duzeltilmisMetin);
+                var frekanslar = new Dictionary<string, int>();
+
+                foreach (var kelime in kelimeler)
+                {
+                    if (frekanslar.ContainsKey(kelime))
+                        frekanslar[kelime]++;
+                    else
+                        frekanslar[kelime] = 1;
+                }
+
+
+                var cumlePuanlari = new Dictionary<string, double>();
+
+
+                int maxFrekans = frekanslar.Values.Count > 0 ? frekanslar.Values.Max() : 1;
+
+                foreach (var cumle in cumleler)
+                {
+                    double puan = 0;
+                    var cumleKelimeleri = TemizleVeAyikla(cumle);
+
+                    foreach (var k in cumleKelimeleri)
+                    {
+                        if (frekanslar.ContainsKey(k))
+                        {
+
+                            puan += (double)frekanslar[k] / maxFrekans;
+                        }
+                    }
+
+                    if (!cumlePuanlari.ContainsKey(cumle))
+                        cumlePuanlari.Add(cumle, puan);
+                }
+
+
+                int ozetCumleSayisi = Math.Max(3, (int)(cumleler.Length * 0.40));
+
+                var enIyiCumleler = cumlePuanlari
+                                    .OrderByDescending(x => x.Value)
+                                    .Take(ozetCumleSayisi)
+                                    .Select(x => x.Key)
+                                    .ToList();
+
+
+                var siraliOzet = cumleler.Where(c => enIyiCumleler.Contains(c)).ToList();
+
+
+                return string.Join(" ", siraliOzet);
+            }
+            catch (Exception ex)
+            {
+                return "Özetleme sırasında bir hata oluştu: " + ex.Message;
+            }
+        }
+
+
+        private List<string> TemizleVeAyikla(string rawText)
+        {
+
+            var temiz = Regex.Replace(rawText, @"[^\w\s]", "");
+
+
+            var kelimeler = temiz.ToLower(new System.Globalization.CultureInfo("tr-TR"))
+                                 .Split(new[] { ' ', '\n', '\r', '\t' }, StringSplitOptions.RemoveEmptyEntries)
+                                 .ToList();
+
+
+            return kelimeler.Where(k => !EtkisizKelimeler.Contains(k)).ToList();
+        }
+
+
+        private static readonly HashSet<string> EtkisizKelimeler = new HashSet<string>
+        {
+
+            "ve", "veya", "ile", "için", "bir", "bu", "şu", "o", "da", "de", "ki", "mı", "mi", "mu", "mü",
+            "ama", "fakat", "lakin", "ancak", "gibi", "kadar", "böyle", "şöyle", "en", "daha", "çok",
+            "ben", "sen", "biz", "siz", "onlar", "bunu", "şunu", "onu", "ne", "nasıl", "neden", "niye",
+            "her", "tüm", "bütün", "bazı", "hiçbir", "şey", "var", "yok", "olan", "olarak", "sonra", "önce",
+            "ise", "diye", "belki", "yani", "çünkü", "dolayı", "rağmen",
+
+
+            "the", "is", "are", "was", "were", "and", "or", "not", "in", "on", "at", "to", "from", "by", "with",
+            "of", "for", "about", "as", "that", "this", "these", "those", "it", "he", "she", "they", "we", "you",
+            "i", "me", "my", "his", "her", "their", "our", "your", "an", "a", "be", "been", "have", "has", "had",
+            "do", "does", "did", "will", "would", "can", "could", "should", "but", "so", "if", "then", "than",
+            "just", "very", "which", "what", "when", "where", "who", "how", "why"
+        };
+
+
+
+        private void Clear_Click(object sender, RoutedEventArgs e)
+        {
+            InputText.Clear();
+            ResponseText.Text = "Sonuç burada görünecek...";
+            InputText.Focus();
+        }
+
+
+        private void Paste_Click(object sender, RoutedEventArgs e)
+        {
+            if (Clipboard.ContainsText())
+            {
+                InputText.Text = Clipboard.GetText();
+            }
+        }
+
+
+        private void Copy_Click(object sender, RoutedEventArgs e)
+        {
+            if (!string.IsNullOrEmpty(ResponseText.Text) && ResponseText.Text != "Sonuç burada görünecek...")
+            {
+                Clipboard.SetText(ResponseText.Text);
+                MessageBox.Show("Özet kopyalandı!", "Başarılı", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+        }
+
+    }
+}
