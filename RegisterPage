@@ -1,0 +1,81 @@
+using System;
+using System.Data.SQLite;
+using System.Windows;
+using System.Windows.Controls;
+
+namespace wpfapp2
+{
+    public partial class registerpage : Page
+    {
+        string connectionString = @"Data Source=D:\VisualStudioCode\wpfapp2\wpfapp2\Userinfo.db";
+
+        public registerpage()
+        {
+            InitializeComponent();
+        }
+
+
+        private void clk_button(object sender, RoutedEventArgs e)
+        {
+            string yeniEmail = txtemail.Text;
+            string yeniSifre = txtsifre.Password;
+
+            if (string.IsNullOrWhiteSpace(yeniEmail) || string.IsNullOrWhiteSpace(yeniSifre))
+            {
+                MessageBox.Show("Lütfen tüm alanları doldurun.");
+                return;
+            }
+
+            try
+            {
+                using (SQLiteConnection conn = new SQLiteConnection(connectionString))
+                {
+                    conn.Open();
+
+                    string checkQuery = "SELECT COUNT(*) FROM userinfo WHERE Email = @Email";
+                    SQLiteCommand checkCmd = new SQLiteCommand(checkQuery, conn);
+                    checkCmd.Parameters.AddWithValue("@Email", yeniEmail);
+
+                    int userCount = Convert.ToInt32(checkCmd.ExecuteScalar());
+
+                    if (userCount > 0)
+                    {
+                        MessageBox.Show("Bu e-posta adresi zaten kullanılıyor!");
+                        return;
+                    }
+
+
+                    string insertQuery = "INSERT INTO userinfo (Email, Sifre) VALUES (@Email, @Sifre)";
+                    SQLiteCommand cmd = new SQLiteCommand(insertQuery, conn);
+
+                    cmd.Parameters.AddWithValue("@Email", yeniEmail);
+                    cmd.Parameters.AddWithValue("@Sifre", yeniSifre);
+
+                    int result = cmd.ExecuteNonQuery();
+
+                    if (result > 0)
+                    {
+                        MessageBox.Show("Kayıt başarılı! Giriş yapabilirsiniz.");
+
+
+                        NavigationService?.Navigate(new loginpage());
+                    }
+                    else
+                    {
+                        MessageBox.Show("Kayıt yapılamadı.");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Hata: " + ex.Message);
+            }
+        }
+
+
+        private void GoLogin_Click(object sender, RoutedEventArgs e)
+        {
+            NavigationService?.Navigate(new loginpage());
+        }
+    }
+}
